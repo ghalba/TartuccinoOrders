@@ -2,17 +2,17 @@
   "use strict";
   const $ = (id) => document.getElementById(id);
   const cfg = window.APP_CONFIG || {};
+  const LOCALE = "fr-FR";
 
-  document.querySelectorAll(".shop-name").forEach((e) => { e.textContent = cfg.shopName || "Coffee Order Log"; });
-  if (cfg.shopName) document.title = cfg.shopName;
+  if (cfg.shopName) document.title = cfg.shopName + " — Commandes";
 
   if (!cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.supabase) {
     $("setupView").hidden = false;
     return;
   }
-  // Accept a pasted address with extra parts (e.g. ".../rest/v1/") — keep only https://xxxx.supabase.co
+  // Accepte une adresse collée avec des parties en trop (ex. ".../rest/v1/") — garde seulement https://xxxx.supabase.co
   let baseUrl = String(cfg.supabaseUrl).trim();
-  try { baseUrl = new URL(baseUrl).origin; } catch (e) { /* leave as typed */ }
+  try { baseUrl = new URL(baseUrl).origin; } catch (e) { /* laisser tel quel */ }
   const sb = window.supabase.createClient(baseUrl, String(cfg.supabaseAnonKey).trim());
 
   const S = {
@@ -23,7 +23,7 @@
   };
   const isOwner = () => S.role === "owner";
 
-  /* ---------- helpers ---------- */
+  /* ---------- outils ---------- */
   function todayStr() {
     const d = new Date();
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -35,18 +35,21 @@
   }
   function niceDay(str) {
     const [y, m, d] = str.split("-").map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    const s = new Date(y, m - 1, d).toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    return s.charAt(0).toUpperCase() + s.slice(1);
   }
   function toCents(v) {
-    const s = String(v).replace(",", ".").trim();
+    const s = String(v).replace(/\s/g, "").replace(",", ".");
     if (!/^\d+(\.\d{0,2})?$/.test(s)) return null;
     return Math.round(parseFloat(s) * 100);
   }
+  const numFmt = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   function money(c) {
-    const s = ((c || 0) / 100).toFixed(2);
-    return S.currency ? S.currency + " " + s : s;
+    const s = numFmt.format((c || 0) / 100);
+    return S.currency ? s + " " + S.currency : s;
   }
-  function timeOf(ts) { return ts ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""; }
+  function plural(n, one, many) { return n + " " + (n <= 1 ? one : many); }
+  function timeOf(ts) { return ts ? new Date(ts).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" }) : ""; }
   function el(tag, attrs, ...kids) {
     const e = document.createElement(tag);
     if (attrs) for (const k in attrs) {
@@ -68,26 +71,25 @@
   }
   function failed(error, what) {
     console.error(error);
-    setStatus("Couldn't " + what + ". Check the internet connection and try again." + (error && error.message ? " (" + error.message + ")" : ""), true);
+    setStatus("Impossible de " + what + ". Vérifiez la connexion internet et réessayez." + (error && error.message ? " (" + error.message + ")" : ""), true);
   }
 
-  /* ---------- sign in / out ---------- */
+  /* ---------- connexion / déconnexion ---------- */
   $("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    $("loginBtn").disabled = true; $("loginStatus").textContent = "Signing in…"; $("loginStatus").classList.remove("err");
+    $("loginBtn").disabled = true; $("loginStatus").textContent = "Connexion…"; $("loginStatus").classList.remove("err");
     const { error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
     $("loginBtn").disabled = false;
     if (error) {
       const m = (error.message || "").toLowerCase();
       let msg;
-      if (m.includes("invalid login")) msg = "Wrong email or password, or this login doesn't exist in Supabase → Authentication → Users.";
-      else if (m.includes("not confirmed")) msg = "This login isn't confirmed yet. In Supabase → Authentication → Users, confirm the user (or recreate it with Auto Confirm ticked).";
-      else if (m.includes("fetch") || m.includes("network")) msg = "Can't reach the database. Check the supabaseUrl in config.js and the internet connection.";
-      else if (m.includes("api key") || m.includes("apikey")) msg = "The key in config.js isn't accepted. Paste the anon public key again.";
-      else msg = "Couldn't sign in: " + error.message;
+      if (m.includes("invalid login")) msg = "E-mail ou mot de passe incorrect.";
+      else if (m.includes("not confirmed")) msg = "Ce compte n'est pas encore confirmé. Demandez au responsable de le confirmer dans Supabase.";
+      else if (m.includes("fetch") || m.includes("network")) msg = "Impossible de joindre la base de données. Vérifiez la connexion internet.";
+      else if (m.includes("api key") || m.includes("apikey")) msg = "La clé dans config.js n'est pas acceptée. Collez à nouveau la clé « anon public ».";
+      else msg = "Connexion impossible : " + error.message;
       $("loginStatus").textContent = msg; $("loginStatus").classList.add("err");
-    }
-    else { $("loginStatus").textContent = ""; $("password").value = ""; }
+    } else { $("loginStatus").textContent = ""; $("password").value = ""; }
   });
   $("signOut").addEventListener("click", () => sb.auth.signOut());
 
@@ -108,14 +110,14 @@
   async function start() {
     if (started) return; started = true;
     $("loginView").hidden = true; $("appView").hidden = false;
-    setStatus("Loading…");
+    setStatus("Chargement…");
     const { data: prof, error } = await sb.from("profiles").select("name, role").eq("id", S.user.id).maybeSingle();
-    if (error) { failed(error, "load your profile"); return; }
+    if (error) { failed(error, "charger votre profil"); return; }
     S.role = prof ? prof.role : "employee";
     S.name = (prof && prof.name) || S.user.email;
     $("whoName").textContent = S.name;
-    $("whoRole").textContent = isOwner() ? "Owner" : "Employee";
-    $("roleLabel").textContent = isOwner() ? "Owner view" : "Counter";
+    $("whoRole").textContent = isOwner() ? "Gérant·e" : "Employé·e";
+    $("roleLabel").textContent = isOwner() ? "Espace gérant" : "Comptoir";
     document.querySelectorAll(".owner-only").forEach((n) => { n.hidden = !isOwner(); });
     $("dayNav").hidden = !isOwner();
     S.today = todayStr(); S.day = S.today; $("dayPick").value = S.day;
@@ -130,13 +132,13 @@
     subscribe();
   }
 
-  /* ---------- data ---------- */
+  /* ---------- données ---------- */
   async function loadMenu() {
     const [m, s] = await Promise.all([
       sb.from("menu_items").select("id, name, price_cents, sort").order("sort").order("name"),
       sb.from("settings").select("currency").eq("id", 1).maybeSingle()
     ]);
-    if (m.error) { failed(m.error, "load the menu"); return; }
+    if (m.error) { failed(m.error, "charger le menu"); return; }
     S.menu = m.data || [];
     S.currency = (s.data && s.data.currency) || "";
     if (document.activeElement !== $("currency")) $("currency").value = S.currency;
@@ -147,7 +149,7 @@
     const seq = ++loadSeq, day = S.day;
     const { data, error } = await sb.from("orders").select("*").eq("day", day).order("created_at", { ascending: false });
     if (seq !== loadSeq) return;
-    if (error) { failed(error, "load the orders"); return; }
+    if (error) { failed(error, "charger les commandes"); return; }
     S.orders = data || [];
   }
   let reloadT;
@@ -161,7 +163,7 @@
       .on("postgres_changes", { event: "*", schema: "public", table: "settings" }, async () => { await loadMenu(); renderAll(); })
       .subscribe();
   }
-  // Roll over to the new day at midnight, and catch up when the tab wakes up.
+  // Passe au jour suivant à minuit, et se met à jour quand l'onglet revient au premier plan.
   setInterval(() => {
     const t = todayStr();
     if (t !== S.today && S.user) { const wasToday = S.day === S.today; S.today = t; if (wasToday || !isOwner()) goDay(t); }
@@ -170,7 +172,7 @@
     if (document.visibilityState === "visible" && S.user && started) { await Promise.all([loadMenu(), loadOrders()]); renderAll(); }
   });
 
-  /* ---------- new order ---------- */
+  /* ---------- nouvelle commande ---------- */
   function addToCart(name, cents) {
     const line = S.cart.find((l) => l.name === name && l.cents === cents);
     if (line) line.qty++; else S.cart.push({ name, cents, qty: 1 });
@@ -182,8 +184,8 @@
     const g = $("menuGrid"); g.replaceChildren();
     if (!S.menu.length) {
       g.append(el("p", { class: "empty", text: isOwner()
-        ? "No menu yet. Add your drinks and prices under “Menu & prices” at the bottom, or type an item here."
-        : "No menu yet. Ask the owner to add it, or type items here." }));
+        ? "Pas encore de menu. Ajoutez vos boissons et leurs prix dans « Menu & prix » en bas de page, ou saisissez un article ici."
+        : "Pas encore de menu. Demandez au gérant de l'ajouter, ou saisissez les articles ici." }));
       return;
     }
     for (const it of S.menu) {
@@ -193,15 +195,15 @@
   }
   function renderCart() {
     const c = $("cart"); c.replaceChildren();
-    if (!S.cart.length) c.append(el("p", { class: "empty", text: "Tap a menu item to start the order." }));
+    if (!S.cart.length) c.append(el("p", { class: "empty", text: "Touchez un article du menu pour commencer la commande." }));
     else {
       S.cart.forEach((l, i) => {
         c.append(el("div", { class: "cart-line" },
           el("span", { class: "name", text: l.name }),
           el("span", { class: "qty" },
-            el("button", { type: "button", "aria-label": "One less " + l.name, text: "−", onclick: () => { l.qty--; if (l.qty <= 0) S.cart.splice(i, 1); renderCart(); } }),
+            el("button", { type: "button", "aria-label": "Un de moins : " + l.name, text: "−", onclick: () => { l.qty--; if (l.qty <= 0) S.cart.splice(i, 1); renderCart(); } }),
             el("span", { class: "num", text: String(l.qty) }),
-            el("button", { type: "button", "aria-label": "One more " + l.name, text: "+", onclick: () => { l.qty++; renderCart(); } })),
+            el("button", { type: "button", "aria-label": "Un de plus : " + l.name, text: "+", onclick: () => { l.qty++; renderCart(); } })),
           el("span", { class: "num", text: money(l.cents * l.qty) })));
       });
       c.append(el("div", { class: "cart-total" }, el("span", { text: "Total" }), el("span", { class: "num", text: money(cartTotal()) })));
@@ -212,8 +214,8 @@
     e.preventDefault();
     const name = $("customName").value.trim();
     const cents = toCents($("customPrice").value);
-    if (!name) { toast("Type the item name"); return; }
-    if (cents === null) { toast("Type a price, like 3.50"); return; }
+    if (!name) { toast("Saisissez le nom de l'article"); return; }
+    if (cents === null) { toast("Saisissez un prix, par ex. 3,50"); return; }
     addToCart(name, cents);
     $("customName").value = ""; $("customPrice").value = "";
   });
@@ -230,45 +232,46 @@
       paid
     }).select("num").single();
     submitting = false;
-    if (error) { failed(error, "log the order"); renderCart(); return; }
+    if (error) { failed(error, "enregistrer la commande"); renderCart(); return; }
     S.cart = []; $("orderNote").value = ""; $("paidNow").checked = false;
     renderCart(); setStatus("");
-    toast("Order #" + data.num + " logged" + (paid ? " as paid" : ""));
+    toast("Commande n°" + data.num + " enregistrée" + (paid ? " (payée)" : ""));
     if (S.day === todayStr()) { await loadOrders(); renderOrders(); renderSummary(); }
   });
 
-  /* ---------- orders list ---------- */
+  /* ---------- liste des commandes ---------- */
   async function setPaid(o, paid) {
     const { error } = await sb.from("orders").update({ paid }).eq("id", o.id);
-    if (error) { failed(error, "update the order"); return; }
-    toast("Order #" + o.num + (paid ? " marked paid" : " marked unpaid"));
+    if (error) { failed(error, "modifier la commande"); return; }
+    toast("Commande n°" + o.num + (paid ? " marquée payée" : " marquée impayée"));
     await loadOrders(); renderOrders(); renderSummary();
   }
   function deleteButton(o) {
     let armed = false, t;
-    const b = el("button", { class: "btn small ghost danger", type: "button", text: "Delete" });
+    const b = el("button", { class: "btn small ghost danger", type: "button", text: "Supprimer" });
     b.addEventListener("click", async () => {
       if (!armed) {
-        armed = true; b.textContent = "Confirm delete"; b.classList.add("armed");
-        t = setTimeout(() => { armed = false; b.textContent = "Delete"; b.classList.remove("armed"); }, 4000);
+        armed = true; b.textContent = "Confirmer la suppression"; b.classList.add("armed");
+        t = setTimeout(() => { armed = false; b.textContent = "Supprimer"; b.classList.remove("armed"); }, 4000);
         return;
       }
       clearTimeout(t);
       const { error } = await sb.from("orders").delete().eq("id", o.id);
-      if (error) { failed(error, "delete the order"); return; }
-      toast("Order #" + o.num + " deleted");
+      if (error) { failed(error, "supprimer la commande"); return; }
+      toast("Commande n°" + o.num + " supprimée");
       await loadOrders(); renderOrders(); renderSummary();
     });
     return b;
   }
   function renderOrders() {
-    $("ordersH").textContent = S.day === todayStr() ? "Today's orders" : "Orders, " + niceDay(S.day);
+    $("ordersH").textContent = S.day === todayStr() ? "Commandes du jour" : "Commandes du " + niceDay(S.day).toLowerCase();
     const box = $("orders"); box.replaceChildren();
     const list = S.orders.filter((o) => S.filter === "all" || (S.filter === "paid" ? o.paid : !o.paid));
     if (!list.length) {
+      const which = S.filter === "paid" ? "payée" : "impayée";
       box.append(el("p", { class: "empty", text: S.orders.length
-        ? "No " + S.filter + " orders for this day."
-        : "No orders logged for this day yet. Orders appear here, newest first." }));
+        ? "Aucune commande " + which + " pour ce jour."
+        : "Aucune commande enregistrée pour ce jour. Les commandes apparaissent ici, les plus récentes en premier." }));
       return;
     }
     for (const o of list) {
@@ -276,24 +279,24 @@
       for (const it of o.items || []) ul.append(el("li", null, el("span", { text: it.qty + " × " + it.name }), el("span", { class: "num", text: money(it.cents * it.qty) })));
       const actions = el("div", { class: "actions" },
         o.paid
-          ? el("button", { class: "btn small ghost", type: "button", text: "Mark unpaid", onclick: () => setPaid(o, false) })
-          : el("button", { class: "btn small primary", type: "button", text: "Mark paid", onclick: () => setPaid(o, true) }));
+          ? el("button", { class: "btn small ghost", type: "button", text: "Marquer impayée", onclick: () => setPaid(o, false) })
+          : el("button", { class: "btn small terra", type: "button", text: "Marquer payée", onclick: () => setPaid(o, true) }));
       if (isOwner()) actions.append(deleteButton(o));
-      const meta = [timeOf(o.created_at), o.note, isOwner() && o.created_by ? "by " + (S.staff[o.created_by] || "former staff") : ""].filter(Boolean).join(" · ");
+      const meta = [timeOf(o.created_at), o.note, isOwner() && o.created_by ? "par " + (S.staff[o.created_by] || "ancien employé") : ""].filter(Boolean).join(" · ");
       box.append(el("article", { class: "ticket " + (o.paid ? "paid" : "unpaid") },
         el("div", { class: "ticket-head" },
-          el("span", { class: "id", text: "#" + o.num }),
+          el("span", { class: "id", text: "n°" + o.num }),
           el("span", { class: "meta", text: meta }),
-          el("span", { class: "pill " + (o.paid ? "paid" : "unpaid"), text: o.paid ? "PAID " + timeOf(o.paid_at) : "UNPAID" })),
+          el("span", { class: "pill " + (o.paid ? "paid" : "unpaid"), text: o.paid ? "PAYÉE " + timeOf(o.paid_at) : "IMPAYÉE" })),
         ul,
         el("div", { class: "ticket-foot" }, el("span", { class: "total-amt num", text: money(o.total_cents) }), actions)));
     }
   }
 
-  /* ---------- owner: summary + day close ---------- */
+  /* ---------- gérant : résumé + clôture ---------- */
   function renderSummary() {
     const next = S.orders.reduce((m, o) => Math.max(m, o.num || 0), 0) + 1;
-    $("nextNum").textContent = S.day === todayStr() ? "Order #" + next : "";
+    $("nextNum").textContent = S.day === todayStr() ? "Commande n°" + next : "";
     $("pastDayNote").hidden = S.day === todayStr();
     if (!isOwner()) return;
 
@@ -302,7 +305,7 @@
     for (const o of S.orders) {
       const t = o.total_cents || 0;
       if (o.paid) { paid += t; nPaid++; } else { due += t; nDue++; }
-      const who = o.created_by ? (S.staff[o.created_by] || "former staff") : "unknown";
+      const who = o.created_by ? (S.staff[o.created_by] || "ancien employé") : "inconnu";
       const s = byStaff.get(who) || { n: 0, cents: 0 }; s.n++; s.cents += t; byStaff.set(who, s);
       for (const it of o.items || []) {
         items += it.qty;
@@ -314,13 +317,13 @@
     $("sumDue").textContent = money(due);
     $("sumAll").textContent = money(paid + due);
     $("sumCount").textContent = String(S.orders.length);
-    $("sumPaidN").textContent = nPaid + (nPaid === 1 ? " paid order" : " paid orders");
-    $("sumDueN").textContent = nDue + (nDue === 1 ? " unpaid order" : " unpaid orders");
-    $("sumItems").textContent = items + (items === 1 ? " item" : " items");
+    $("sumPaidN").textContent = plural(nPaid, "commande payée", "commandes payées");
+    $("sumDueN").textContent = plural(nDue, "commande impayée", "commandes impayées");
+    $("sumItems").textContent = plural(items, "article", "articles");
 
     const tb = $("itemsBody"); tb.replaceChildren();
     const rows = [...byItem.entries()].sort((a, b) => b[1].qty - a[1].qty);
-    if (!rows.length) tb.append(el("tr", null, el("td", { colspan: "3", class: "empty", text: "Nothing sold on this day." })));
+    if (!rows.length) tb.append(el("tr", null, el("td", { colspan: "3", class: "empty", text: "Rien de vendu ce jour-là." })));
     for (const [name, r] of rows) tb.append(el("tr", null, el("td", { text: name }), el("td", { class: "r num", text: String(r.qty) }), el("td", { class: "r num", text: money(r.cents) })));
     $("itemsQty").textContent = String(items);
     $("itemsRev").textContent = money(paid + due);
@@ -330,26 +333,26 @@
     $("closeDate").textContent = niceDay(S.day);
     const w = $("closeWarn");
     w.hidden = !nDue;
-    w.textContent = nDue ? nDue + (nDue === 1 ? " order is" : " orders are") + " still unpaid (" + money(due) + ")." : "";
+    w.textContent = nDue ? (nDue === 1 ? "1 commande est encore impayée" : nDue + " commandes sont encore impayées") + " (" + money(due) + ")." : "";
 
     const sb2 = $("byStaff"); sb2.replaceChildren();
     for (const [who, s] of byStaff) sb2.append(el("tr", null, el("td", { text: who }), el("td", { class: "r num", text: String(s.n) }), el("td", { class: "r num", text: money(s.cents) })));
     $("byStaffWrap").hidden = !byStaff.size;
   }
 
-  /* ---------- owner: menu editor ---------- */
+  /* ---------- gérant : menu ---------- */
   function renderMenuEditor() {
     if (!isOwner()) return;
-    if (!S.menuDraft) S.menuDraft = S.menu.map((m) => ({ id: m.id, name: m.name, price: (m.price_cents / 100).toFixed(2) }));
+    if (!S.menuDraft) S.menuDraft = S.menu.map((m) => ({ id: m.id, name: m.name, price: numFmt.format(m.price_cents / 100).replace(/\s/g, "") }));
     const box = $("menuEdit"); box.replaceChildren();
-    if (!S.menuDraft.length) box.append(el("p", { class: "empty", text: "No items yet. Add one, give it a price, then save." }));
+    if (!S.menuDraft.length) box.append(el("p", { class: "empty", text: "Aucun article. Ajoutez-en un, indiquez son prix, puis enregistrez." }));
     S.menuDraft.forEach((r, i) => {
-      const n = el("input", { class: "field", id: "mn-" + i, placeholder: "Item name", "aria-label": "Item name", maxlength: "60" });
+      const n = el("input", { class: "field", id: "mn-" + i, placeholder: "Nom de l'article", "aria-label": "Nom de l'article", maxlength: "60" });
       n.value = r.name; n.addEventListener("input", () => { r.name = n.value; });
-      const p = el("input", { class: "field num", id: "mp-" + i, placeholder: "0.00", inputmode: "decimal", "aria-label": "Price" });
+      const p = el("input", { class: "field num", id: "mp-" + i, placeholder: "0,00", inputmode: "decimal", "aria-label": "Prix" });
       p.value = r.price; p.addEventListener("input", () => { r.price = p.value; });
       box.append(el("div", { class: "menu-row" }, n, p,
-        el("button", { class: "btn small ghost danger", type: "button", text: "Remove", onclick: () => { S.menuDraft.splice(i, 1); renderMenuEditor(); } })));
+        el("button", { class: "btn small ghost danger", type: "button", text: "Retirer", onclick: () => { S.menuDraft.splice(i, 1); renderMenuEditor(); } })));
     });
   }
   $("addMenuRow").addEventListener("click", () => {
@@ -364,13 +367,13 @@
       const name = r.name.trim();
       if (!name) continue;
       const cents = toCents(r.price);
-      if (cents === null) { $("menuStatus").textContent = "“" + name + "” needs a price, like 3.50."; return; }
+      if (cents === null) { $("menuStatus").textContent = "« " + name + " » a besoin d'un prix, par ex. 3,50."; return; }
       const row = { name: name.slice(0, 60), price_cents: cents, sort: sort++ };
       if (r.id != null) keep.push(Object.assign({ id: r.id }, row)); else add.push(row);
     }
     const keptIds = new Set(keep.map((r) => r.id));
     const removed = S.menu.filter((m) => !keptIds.has(m.id)).map((m) => m.id);
-    $("saveMenu").disabled = true; $("menuStatus").textContent = "Saving…";
+    $("saveMenu").disabled = true; $("menuStatus").textContent = "Enregistrement…";
     const steps = [];
     if (removed.length) steps.push(sb.from("menu_items").delete().in("id", removed));
     if (keep.length) steps.push(sb.from("menu_items").upsert(keep));
@@ -379,14 +382,14 @@
     const results = await Promise.all(steps);
     $("saveMenu").disabled = false;
     const bad = results.find((r) => r.error);
-    if (bad) { $("menuStatus").textContent = ""; failed(bad.error, "save the menu"); return; }
-    $("menuStatus").textContent = "Saved.";
-    toast("Menu saved");
+    if (bad) { $("menuStatus").textContent = ""; failed(bad.error, "enregistrer le menu"); return; }
+    $("menuStatus").textContent = "Enregistré.";
+    toast("Menu enregistré");
     S.menuDraft = null;
     await loadMenu(); renderAll();
   });
 
-  /* ---------- owner: day navigation + filters ---------- */
+  /* ---------- gérant : navigation par jour + filtres ---------- */
   async function goDay(d) {
     if (!d) return;
     S.day = d; $("dayPick").value = d;
@@ -405,6 +408,6 @@
 
   function renderAll() { renderMenu(); renderCart(); renderOrders(); renderSummary(); renderMenuEditor(); }
 
-  // First paint: show sign-in unless a saved session exists.
+  // Premier affichage : écran de connexion sauf si une session est déjà enregistrée.
   sb.auth.getSession().then(({ data }) => { if (!data.session) $("loginView").hidden = false; });
 })();

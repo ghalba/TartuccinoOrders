@@ -1,212 +1,229 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Coffee Order Log</title>
+<meta name="theme-color" content="#F3EBDE">
+<title>Tartuccino — Commandes</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Jost:wght@400;500;600&display=swap">
 <style>
+/* Tartuccino brand: cream ground from the logo, sage green for structure, terracotta for what needs attention. */
 :root {
-  --bg: #f6f4f1; --surface: #ffffff; --ink: #2b1d16; --muted: #7a6a60; --line: #e4ddd6;
-  --accent: #2f6b5a; --accent-ink: #ffffff; --accent-soft: #e2efe9;
-  --paid: #2f6b5a; --paid-soft: #e2efe9; --due: #a35d0c; --due-soft: #fbeed9; --danger: #b3372b;
-  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --radius: 10px;
+  --bg: #F3EBDE;          /* logo background */
+  --surface: #FBF7F0;
+  --ink: #3F3E30;         /* deep olive for text */
+  --muted: #7C7A66;
+  --line: #E0D6C4;
+  --sage: #A9A790;        /* logo letters */
+  --sage-deep: #67664E;   /* buttons, paid */
+  --sage-soft: #E7E5D5;
+  --terra: #BD755C;       /* logo accent */
+  --terra-deep: #A0583F;  /* unpaid text */
+  --terra-soft: #F3DED3;
+  --danger: #A8402F;
+  --on-dark: #FBF7F0;
+  --font-display: "Gloock", "Didot", "Bodoni MT", Georgia, serif;
+  --font-body: "Jost", "Futura", "Century Gothic", "Segoe UI", system-ui, sans-serif;
+  --radius: 14px;
   color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #17120f; --surface: #221b17; --ink: #f1e9e2; --muted: #a8988c; --line: #3a2f29;
-    --accent: #6fbfa5; --accent-ink: #10201b; --accent-soft: #1f3530;
-    --paid: #7dcab0; --paid-soft: #1f3530; --due: #f0b45e; --due-soft: #3b2a14; --danger: #f08a7e;
-    color-scheme: dark;
-  }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--bg); }
 body {
-  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.45;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 20px 48px;
+  padding-block: 16px 48px;
 }
-.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
-h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
-h1 { font-size: 1.75rem; }
-h2 { font-size: 1.15rem; }
+.wrap { max-width: 1140px; margin: 0 auto; display: grid; gap: 20px; }
+h1, h2 { font-family: var(--font-display); font-weight: 400; margin: 0; text-wrap: balance; letter-spacing: 0.005em; }
+h2 { font-size: 1.45rem; }
 .num { font-variant-numeric: tabular-nums; }
-.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.label { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 500; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--terra); outline-offset: 2px; }
 
-header.top { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
+header.top { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 16px; }
+.brand img { height: 74px; width: auto; display: block; }
+.brand .label { border-left: 1px solid var(--line); padding-left: 16px; }
 .who { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .daynav { display: flex; gap: 6px; align-items: center; }
-.daynav input[type=date] { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 10px; }
-.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; font-weight: 500; }
-.btn:hover { border-color: var(--muted); }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.daynav input[type=date] { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 16px; font-weight: 500; }
+.btn:hover { border-color: var(--sage); }
+.btn.primary { background: var(--sage-deep); color: var(--on-dark); border-color: var(--sage-deep); }
+.btn.primary:hover { background: var(--ink); border-color: var(--ink); }
+.btn.terra { background: var(--terra); color: var(--on-dark); border-color: var(--terra); }
+.btn.terra:hover { background: var(--terra-deep); border-color: var(--terra-deep); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn.small { padding: 4px 10px; font-size: 0.85rem; }
+.btn.small { padding: 4px 12px; font-size: 0.88rem; }
 .btn.ghost { background: transparent; }
 .btn.danger { color: var(--danger); }
-.btn.danger.armed { background: var(--danger); color: var(--surface); border-color: var(--danger); }
+.btn.danger.armed { background: var(--danger); color: var(--on-dark); border-color: var(--danger); }
 
 .summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.summary > div { background: var(--surface); padding: 14px 16px; display: grid; gap: 4px; }
-.summary .big { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; }
-.summary .collected .big { color: var(--paid); }
-.summary .due .big { color: var(--due); }
+.summary > div { background: var(--surface); padding: 16px 18px; display: grid; gap: 4px; }
+.summary .big { font-family: var(--font-display); font-size: 1.85rem; line-height: 1.1; }
+.summary .collected .big { color: var(--sage-deep); }
+.summary .due .big { color: var(--terra-deep); }
 .summary small { color: var(--muted); }
 @media (max-width: 640px) { .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .main { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 20px; align-items: start; }
 @media (max-width: 860px) { .main { grid-template-columns: minmax(0, 1fr); } }
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: grid; gap: 14px; min-width: 0; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-.menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
-.menu-btn { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 10px; text-align: left; display: grid; gap: 2px; min-width: 0; }
-.menu-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
-.menu-btn b { font-weight: 600; overflow-wrap: anywhere; }
-.menu-btn span { color: var(--muted); font-size: 0.85rem; }
-.empty { color: var(--muted); font-size: 0.92rem; padding: 10px 0; margin: 0; }
+.menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; }
+.menu-btn { border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 11px 12px; text-align: left; display: grid; gap: 2px; min-width: 0; }
+.menu-btn:hover { border-color: var(--sage); background: var(--sage-soft); }
+.menu-btn b { font-weight: 500; overflow-wrap: anywhere; }
+.menu-btn span { color: var(--terra-deep); font-size: 0.88rem; }
+.empty { color: var(--muted); font-size: 0.95rem; padding: 10px 0; margin: 0; }
 
-.custom { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px; }
-.field { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 10px; min-width: 0; width: 100%; }
+.custom { display: grid; grid-template-columns: minmax(0, 1fr) 96px auto; gap: 8px; }
+.field { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 12px; min-width: 0; width: 100%; }
+.field:focus { border-color: var(--sage); }
 
-.cart { border-top: 1px dashed var(--line); padding-top: 12px; display: grid; gap: 8px; }
+.cart { border-top: 1px dashed var(--sage); padding-top: 12px; display: grid; gap: 8px; }
 .cart-line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; }
 .cart-line .name { overflow-wrap: anywhere; }
 .qty { display: inline-flex; align-items: center; gap: 6px; }
-.qty button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg); line-height: 1; }
-.cart-total { display: flex; justify-content: space-between; font-weight: 600; font-size: 1.05rem; border-top: 1px solid var(--line); padding-top: 10px; }
+.qty button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg); line-height: 1; }
+.cart-total { display: flex; justify-content: space-between; font-weight: 600; font-size: 1.1rem; border-top: 1px solid var(--line); padding-top: 10px; }
 .check { display: flex; gap: 8px; align-items: center; font-weight: 500; }
-.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.check input { width: 19px; height: 19px; accent-color: var(--sage-deep); }
 
-.tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.tabs button { border: 0; background: transparent; padding: 6px 12px; font-size: 0.88rem; font-weight: 500; color: var(--muted); }
-.tabs button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--bg); }
+.tabs button { border: 0; background: transparent; padding: 6px 14px; font-size: 0.9rem; font-weight: 500; color: var(--muted); }
+.tabs button[aria-pressed="true"] { background: var(--sage-deep); color: var(--on-dark); }
 
 .orders { display: grid; gap: 10px; }
-.ticket { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 8px; border-left-width: 4px; }
-.ticket.paid { border-left-color: var(--paid); }
-.ticket.unpaid { border-left-color: var(--due); background: color-mix(in srgb, var(--due-soft) 45%, var(--surface)); }
+.ticket { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; border-left-width: 5px; background: var(--surface); }
+.ticket.paid { border-left-color: var(--sage); }
+.ticket.unpaid { border-left-color: var(--terra); background: #FAF0E9; }
 .ticket-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.ticket-head .id { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; }
-.ticket-head .meta { color: var(--muted); font-size: 0.85rem; flex: 1; min-width: 0; }
-.ticket ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 0.92rem; }
+.ticket-head .id { font-family: var(--font-display); font-size: 1.25rem; }
+.ticket-head .meta { color: var(--muted); font-size: 0.88rem; flex: 1; min-width: 0; }
+.ticket ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 0.95rem; }
 .ticket li { display: flex; justify-content: space-between; gap: 10px; }
 .ticket li span:first-child { overflow-wrap: anywhere; min-width: 0; }
 .ticket-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ticket-foot .actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.pill { font-size: 0.75rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.03em; }
-.pill.paid { background: var(--paid-soft); color: var(--paid); }
-.pill.unpaid { background: var(--due-soft); color: var(--due); }
-.pill.role { background: var(--accent-soft); color: var(--accent); }
-.total-amt { font-weight: 700; }
+.pill { font-size: 0.74rem; font-weight: 600; padding: 2px 10px; border-radius: 999px; letter-spacing: 0.06em; }
+.pill.paid { background: var(--sage-soft); color: var(--sage-deep); }
+.pill.unpaid { background: var(--terra-soft); color: var(--terra-deep); }
+.pill.role { background: var(--terra-soft); color: var(--terra-deep); }
+.total-amt { font-weight: 600; font-size: 1.05rem; }
 
 .close-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; }
 @media (max-width: 760px) { .close-grid { grid-template-columns: minmax(0, 1fr); } }
 .table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
-th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
-th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
 td.r, th.r { text-align: right; }
-tfoot td { font-weight: 700; border-bottom: 0; }
-.close-box { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; }
+tfoot td { font-weight: 600; border-bottom: 0; }
+.close-box { border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 16px; display: grid; gap: 8px; align-content: start; }
 .close-row { display: flex; justify-content: space-between; gap: 10px; }
-.close-row.grand { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; border-top: 1px solid var(--line); padding-top: 8px; }
-.warn { color: var(--due); font-size: 0.9rem; font-weight: 500; }
+.close-row.grand { font-family: var(--font-display); font-size: 1.45rem; border-top: 1px solid var(--sage); padding-top: 10px; }
+.warn { color: var(--terra-deep); font-size: 0.93rem; font-weight: 500; margin: 0; }
 
-details.panel summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
+details.panel summary { cursor: pointer; font-family: var(--font-display); font-size: 1.35rem; }
 .menu-edit { display: grid; gap: 8px; }
-.menu-row { display: grid; grid-template-columns: minmax(0, 1fr) 100px auto; gap: 8px; }
+.menu-row { display: grid; grid-template-columns: minmax(0, 1fr) 104px auto; gap: 8px; }
 .row-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-.login { max-width: 380px; margin: 8vh auto 0; }
+.login { max-width: 400px; margin: 6vh auto 0; background: var(--bg); border-color: transparent; }
+.login .logo { width: 240px; max-width: 100%; display: block; margin: 0 auto 6px; }
 .login form { display: grid; gap: 12px; }
-.status { font-size: 0.88rem; color: var(--muted); margin: 0; }
+.login .label { text-align: center; }
+.status { font-size: 0.92rem; color: var(--muted); margin: 0; }
 .status.err { color: var(--danger); }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--surface); padding: 9px 16px; border-radius: 8px; font-weight: 500; font-size: 0.92rem; z-index: 20; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--on-dark); padding: 10px 18px; border-radius: 999px; font-weight: 500; font-size: 0.95rem; z-index: 20; }
 code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+@media (max-width: 520px) { .brand img { height: 56px; } .brand .label { display: none; } }
 </style>
 </head>
 <body>
 
-<!-- Shown when config.js is not filled in -->
+<!-- Affiché si config.js n'est pas rempli -->
 <section class="panel login" id="setupView" hidden>
-  <h1>Almost ready</h1>
-  <p>Open <code>config.js</code> and paste your Supabase project URL and anon key, then reload this page. The README explains where to find them.</p>
+  <img class="logo" src="logo.png" alt="Tartuccino — Eat &amp; Drink">
+  <h1>Presque prêt</h1>
+  <p>Ouvrez <code>config.js</code>, collez l'adresse de votre projet Supabase et la clé « anon public », puis rechargez la page.</p>
 </section>
 
-<!-- Sign in -->
+<!-- Connexion -->
 <section class="panel login" id="loginView" hidden>
-  <div><div class="label">Staff sign in</div><h1 class="shop-name">Coffee Order Log</h1></div>
+  <img class="logo" src="logo.png" alt="Tartuccino — Eat &amp; Drink">
+  <div class="label">Connexion de l'équipe</div>
   <form id="loginForm">
-    <input class="field" id="email" type="email" autocomplete="username" placeholder="Email" required aria-label="Email">
-    <input class="field" id="password" type="password" autocomplete="current-password" placeholder="Password" required aria-label="Password">
-    <button class="btn primary" type="submit" id="loginBtn">Sign in</button>
+    <input class="field" id="email" type="email" autocomplete="username" placeholder="E-mail" required aria-label="E-mail">
+    <input class="field" id="password" type="password" autocomplete="current-password" placeholder="Mot de passe" required aria-label="Mot de passe">
+    <button class="btn primary" type="submit" id="loginBtn">Se connecter</button>
     <p class="status" id="loginStatus"></p>
   </form>
 </section>
 
-<!-- The app -->
+<!-- Application -->
 <div class="wrap" id="appView" hidden>
   <header class="top">
-    <div>
-      <div class="label" id="roleLabel">Counter log</div>
-      <h1 class="shop-name">Coffee Order Log</h1>
+    <div class="brand">
+      <img src="logo.png" alt="Tartuccino — Eat &amp; Drink">
+      <span class="label" id="roleLabel">Comptoir</span>
     </div>
     <div class="who">
       <div class="daynav" id="dayNav" hidden>
-        <button class="btn small" id="prevDay" aria-label="Previous day">‹</button>
-        <input type="date" id="dayPick" aria-label="Day">
-        <button class="btn small" id="nextDay" aria-label="Next day">›</button>
-        <button class="btn small" id="todayBtn">Today</button>
+        <button class="btn small" id="prevDay" aria-label="Jour précédent">‹</button>
+        <input type="date" id="dayPick" aria-label="Jour">
+        <button class="btn small" id="nextDay" aria-label="Jour suivant">›</button>
+        <button class="btn small" id="todayBtn">Aujourd'hui</button>
       </div>
       <span id="whoName"></span>
       <span class="pill role" id="whoRole"></span>
-      <button class="btn small ghost" id="signOut">Sign out</button>
+      <button class="btn small ghost" id="signOut">Se déconnecter</button>
     </div>
   </header>
 
   <p class="status" id="status" hidden></p>
 
-  <section class="summary owner-only" aria-label="Day summary">
-    <div class="collected"><span class="label">Collected</span><span class="big num" id="sumPaid">0.00</span><small id="sumPaidN">0 paid orders</small></div>
-    <div class="due"><span class="label">Still unpaid</span><span class="big num" id="sumDue">0.00</span><small id="sumDueN">0 unpaid orders</small></div>
-    <div><span class="label">Day total</span><span class="big num" id="sumAll">0.00</span><small>paid + unpaid</small></div>
-    <div><span class="label">Orders</span><span class="big num" id="sumCount">0</span><small id="sumItems">0 items</small></div>
+  <section class="summary owner-only" aria-label="Résumé de la journée">
+    <div class="collected"><span class="label">Encaissé</span><span class="big num" id="sumPaid">0,00</span><small id="sumPaidN">0 commande payée</small></div>
+    <div class="due"><span class="label">Reste à payer</span><span class="big num" id="sumDue">0,00</span><small id="sumDueN">0 commande impayée</small></div>
+    <div><span class="label">Total du jour</span><span class="big num" id="sumAll">0,00</span><small>payé + impayé</small></div>
+    <div><span class="label">Commandes</span><span class="big num" id="sumCount">0</span><small id="sumItems">0 article</small></div>
   </section>
 
   <div class="main">
     <section class="panel" aria-labelledby="newOrderH">
-      <div class="panel-head"><h2 id="newOrderH">New order</h2><span class="label" id="nextNum"></span></div>
-      <p class="warn" id="pastDayNote" hidden>You're looking at a past day. New orders are always logged for today.</p>
+      <div class="panel-head"><h2 id="newOrderH">Nouvelle commande</h2><span class="label" id="nextNum"></span></div>
+      <p class="warn" id="pastDayNote" hidden>Vous consultez un jour passé. Les nouvelles commandes sont toujours enregistrées pour aujourd'hui.</p>
       <div class="menu-grid" id="menuGrid"></div>
       <form class="custom" id="customForm" autocomplete="off">
-        <input class="field" id="customName" placeholder="Other item" aria-label="Item name" maxlength="60">
-        <input class="field num" id="customPrice" placeholder="Price" inputmode="decimal" aria-label="Item price">
-        <button class="btn" type="submit">Add</button>
+        <input class="field" id="customName" placeholder="Autre article" aria-label="Nom de l'article" maxlength="60">
+        <input class="field num" id="customPrice" placeholder="Prix" inputmode="decimal" aria-label="Prix de l'article">
+        <button class="btn" type="submit">Ajouter</button>
       </form>
       <div class="cart" id="cart"></div>
-      <input class="field" id="orderNote" placeholder="Customer name or table (optional)" aria-label="Customer or table" maxlength="80">
-      <label class="check"><input type="checkbox" id="paidNow"> Paid now</label>
-      <button class="btn primary" id="submitOrder" disabled>Log order</button>
+      <input class="field" id="orderNote" placeholder="Nom du client ou table (facultatif)" aria-label="Client ou table" maxlength="80">
+      <label class="check"><input type="checkbox" id="paidNow"> Payé maintenant</label>
+      <button class="btn primary" id="submitOrder" disabled>Enregistrer la commande</button>
     </section>
 
     <section class="panel" aria-labelledby="ordersH">
       <div class="panel-head">
-        <h2 id="ordersH">Today's orders</h2>
-        <div class="tabs" role="group" aria-label="Filter orders">
-          <button data-f="all" aria-pressed="true">All</button>
-          <button data-f="unpaid" aria-pressed="false">Unpaid</button>
-          <button data-f="paid" aria-pressed="false">Paid</button>
+        <h2 id="ordersH">Commandes du jour</h2>
+        <div class="tabs" role="group" aria-label="Filtrer les commandes">
+          <button data-f="all" aria-pressed="true">Toutes</button>
+          <button data-f="unpaid" aria-pressed="false">Impayées</button>
+          <button data-f="paid" aria-pressed="false">Payées</button>
         </div>
       </div>
       <div class="orders" id="orders"></div>
@@ -214,23 +231,23 @@ code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
   </div>
 
   <section class="panel owner-only" aria-labelledby="closeH">
-    <div class="panel-head"><h2 id="closeH">End of day</h2><span class="label" id="closeDate"></span></div>
+    <div class="panel-head"><h2 id="closeH">Clôture de la journée</h2><span class="label" id="closeDate"></span></div>
     <div class="close-grid">
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Item</th><th class="r">Sold</th><th class="r">Revenue</th></tr></thead>
+          <thead><tr><th>Article</th><th class="r">Vendus</th><th class="r">Chiffre</th></tr></thead>
           <tbody id="itemsBody"></tbody>
-          <tfoot><tr><td>Total</td><td class="r num" id="itemsQty">0</td><td class="r num" id="itemsRev">0.00</td></tr></tfoot>
+          <tfoot><tr><td>Total</td><td class="r num" id="itemsQty">0</td><td class="r num" id="itemsRev">0,00</td></tr></tfoot>
         </table>
       </div>
       <div class="close-box">
-        <div class="close-row"><span>Cash in (paid orders)</span><span class="num" id="closePaid">0.00</span></div>
-        <div class="close-row"><span>Unpaid orders</span><span class="num" id="closeDue">0.00</span></div>
-        <div class="close-row grand"><span>Day total</span><span class="num" id="closeAll">0.00</span></div>
-        <div class="warn" id="closeWarn" hidden></div>
+        <div class="close-row"><span>Encaissé (commandes payées)</span><span class="num" id="closePaid">0,00</span></div>
+        <div class="close-row"><span>Commandes impayées</span><span class="num" id="closeDue">0,00</span></div>
+        <div class="close-row grand"><span>Total du jour</span><span class="num" id="closeAll">0,00</span></div>
+        <p class="warn" id="closeWarn" hidden></p>
         <div class="table-wrap" id="byStaffWrap" hidden>
           <table>
-            <thead><tr><th>Logged by</th><th class="r">Orders</th><th class="r">Total</th></tr></thead>
+            <thead><tr><th>Saisi par</th><th class="r">Commandes</th><th class="r">Total</th></tr></thead>
             <tbody id="byStaff"></tbody>
           </table>
         </div>
@@ -239,21 +256,21 @@ code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
   </section>
 
   <details class="panel owner-only" id="menuPanel">
-    <summary>Menu &amp; prices</summary>
+    <summary>Menu &amp; prix</summary>
     <div class="menu-edit" id="menuEdit"></div>
     <div class="row-actions">
-      <button class="btn small" id="addMenuRow" type="button">Add item</button>
-      <label class="label" for="currency">Currency</label>
-      <input class="field" id="currency" style="width:90px" placeholder="e.g. $" maxlength="6">
+      <button class="btn small" id="addMenuRow" type="button">Ajouter un article</button>
+      <label class="label" for="currency">Devise</label>
+      <input class="field" id="currency" style="width:96px" placeholder="ex. DA, €" maxlength="6">
     </div>
     <div class="row-actions">
-      <button class="btn primary" id="saveMenu" type="button">Save menu</button>
+      <button class="btn primary" id="saveMenu" type="button">Enregistrer le menu</button>
       <span class="status" id="menuStatus"></span>
     </div>
   </details>
 </div>
 
-<div class="toast" id="toast" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
