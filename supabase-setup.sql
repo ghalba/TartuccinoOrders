@@ -68,6 +68,12 @@ create table if not exists public.orders (
 );
 create index if not exists orders_day_idx on public.orders (day);
 
+-- Added for editable orders: how much of the order has been paid so far,
+-- so a customer who adds items after paying owes only the difference.
+alter table public.orders add column if not exists paid_cents int not null default 0;
+alter table public.orders add column if not exists updated_at timestamptz;
+update public.orders set paid_cents = total_cents where paid and paid_cents = 0;
+
 -- The database numbers each day's orders (#1, #2 …), adds up the total,
 -- and records who logged it and when, so nobody can fake these values.
 create or replace function public.orders_before_insert() returns trigger
@@ -89,6 +95,8 @@ begin
   new.created_by := auth.uid();
   new.created_at := now();
   new.paid_at    := case when new.paid then now() else null end;
+  new.paid_cents := case when new.paid then new.total_cents else 0 end;
+  new.updated_at := null;
   return new;
 end $$;
 
@@ -96,13 +104,46 @@ drop trigger if exists orders_before_insert on public.orders;
 create trigger orders_before_insert
   before insert on public.orders for each row execute function public.orders_before_insert();
 
+-- On every change: keep number, day and author fixed, recompute the total
+-- when items change, and keep the paid amount consistent.
+--   "paid" switched on  → the whole order is now paid
+--   "paid" switched off → nothing is paid
+--   items changed       → what was already paid stays paid; if items were
+--                          added, the order is unpaid for the difference
 create or replace function public.orders_before_update() returns trigger
 language plpgsql as $$
 begin
-  if new.paid and not old.paid then new.paid_at := now();
-  elsif not new.paid then new.paid_at := null;
-  else new.paid_at := old.paid_at;
+  new.num := old.num; new.day := old.day;
+  new.created_at := old.created_at; new.created_by := old.created_by;
+
+  if new.items is distinct from old.items then
+    if jsonb_typeof(new.items) <> 'array' or jsonb_array_length(new.items) = 0 or exists (
+      select 1 from jsonb_array_elements(new.items) i
+      where coalesce((i->>'qty')::int, 0) <= 0
+         or coalesce((i->>'cents')::int, -1) < 0
+         or coalesce(length(i->>'name'), 0) = 0
+    ) then
+      raise exception 'Each item needs a name, a quantity above 0 and a price';
+    end if;
+    select coalesce(sum((i->>'qty')::int * (i->>'cents')::int), 0)
+      into new.total_cents from jsonb_array_elements(new.items) i;
+    new.updated_at := now();
+  else
+    new.total_cents := old.total_cents;
   end if;
+
+  if new.paid_cents is distinct from old.paid_cents then
+    -- only possible from the SQL Editor (staff can't write this column)
+    new.paid_cents := least(greatest(new.paid_cents, 0), new.total_cents);
+  elsif new.paid is distinct from old.paid then
+    new.paid_cents := case when new.paid then new.total_cents else 0 end;
+  else
+    new.paid_cents := least(old.paid_cents, new.total_cents);
+  end if;
+  new.paid    := new.paid_cents >= new.total_cents;
+  new.paid_at := case when not new.paid then null
+                      when old.paid then old.paid_at
+                      else now() end;
   return new;
 end $$;
 
@@ -112,7 +153,7 @@ create trigger orders_before_update
 
 ------------------------------------------------------------
 -- 4. Who can do what
---    Employees: see the menu, log orders, see and mark paid the last 36 hours of orders.
+--    Employees: see the menu, log orders, see, change and mark paid the last 36 hours of orders.
 --    Owner:     all of that, plus every past day, the menu, and deleting orders.
 --    Not signed in: nothing.
 ------------------------------------------------------------
@@ -127,7 +168,7 @@ grant select on public.profiles to authenticated;
 grant select, update on public.settings to authenticated;
 grant select, insert, update, delete on public.menu_items to authenticated;
 grant select, insert, delete on public.orders to authenticated;
-grant update (paid) on public.orders to authenticated;   -- staff can change only "paid"
+grant update (paid, items, note) on public.orders to authenticated;   -- staff can change items, note and "paid" only
 
 drop policy if exists "profiles: own or owner" on public.profiles;
 create policy "profiles: own or owner" on public.profiles

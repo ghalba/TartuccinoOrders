@@ -19,9 +19,12 @@
     user: null, role: "employee", name: "", staff: {},
     today: todayStr(), day: todayStr(),
     orders: [], menu: [], currency: "",
-    cart: [], filter: "all", menuDraft: null, channel: null
+    cart: [], filter: "all", menuDraft: null, channel: null,
+    editing: null   // { id, num, paidCents } while an existing order is being changed
   };
   const isOwner = () => S.role === "owner";
+  // Amount already paid on an order (works before and after the paid_cents column exists)
+  const paidOf = (o) => (typeof o.paid_cents === "number" ? o.paid_cents : (o.paid ? o.total_cents || 0 : 0));
 
   /* ---------- outils ---------- */
   function todayStr() {
@@ -151,6 +154,11 @@
     if (seq !== loadSeq) return;
     if (error) { failed(error, "charger les commandes"); return; }
     S.orders = data || [];
+    if (S.editing) {
+      const cur = S.orders.find((o) => o.id === S.editing.id);
+      if (cur) { S.editing.paidCents = paidOf(cur); renderCart(); }
+      else { S.editing = null; S.cart = []; $("orderNote").value = ""; renderCart(); toast("La commande en cours de modification n'est plus affichée"); }
+    }
   }
   let reloadT;
   function subscribe() {
@@ -208,8 +216,41 @@
       });
       c.append(el("div", { class: "cart-total" }, el("span", { text: "Total" }), el("span", { class: "num", text: money(cartTotal()) })));
     }
+
+    const ed = S.editing;
+    $("newOrderH").closest(".panel").classList.toggle("editing", !!ed);
+    $("newOrderH").textContent = ed ? "Modifier la commande n°" + ed.num : "Nouvelle commande";
+    $("submitOrder").textContent = ed ? "Enregistrer les modifications" : "Enregistrer la commande";
+    $("cancelEdit").hidden = !ed;
+    $("nextNum").hidden = !!ed;
+    $("submitRow").classList.toggle("single", !ed);
+    const info = $("editInfo");
+    if (ed && ed.paidCents > 0) {
+      const diff = cartTotal() - ed.paidCents;
+      info.textContent = "Déjà payé : " + money(ed.paidCents) + " · " +
+        (diff > 0 ? "Reste à payer : " + money(diff) : diff < 0 ? "À rendre au client : " + money(-diff) : "Rien à payer en plus");
+      info.hidden = false;
+    } else info.hidden = true;
+    const owes = ed ? cartTotal() - ed.paidCents > 0 : true;
+    $("paidNowLabel").textContent = ed ? (ed.paidCents > 0 ? "Encaisser le reste maintenant" : "Payé maintenant") : "Payé maintenant";
+    $("paidNow").closest(".check").hidden = !owes;
     $("submitOrder").disabled = !S.cart.length || submitting;
   }
+
+  function startEdit(o) {
+    S.editing = { id: o.id, num: o.num, paidCents: paidOf(o) };
+    S.cart = (o.items || []).map((it) => ({ name: it.name, cents: it.cents, qty: it.qty }));
+    $("orderNote").value = o.note || "";
+    $("paidNow").checked = false;
+    renderCart(); renderOrders();
+    $("newOrderH").closest(".panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function cancelEdit() {
+    S.editing = null; S.cart = [];
+    $("orderNote").value = ""; $("paidNow").checked = false;
+    renderCart(); renderOrders();
+  }
+  $("cancelEdit").addEventListener("click", cancelEdit);
   $("customForm").addEventListener("submit", (e) => {
     e.preventDefault();
     const name = $("customName").value.trim();
@@ -224,7 +265,27 @@
   $("submitOrder").addEventListener("click", async () => {
     if (!S.cart.length || submitting) return;
     submitting = true; renderCart();
-    const paid = $("paidNow").checked;
+    const paid = $("paidNow").checked && !$("paidNow").closest(".check").hidden;
+
+    if (S.editing) {
+      const ed = S.editing;
+      const { data: row, error } = await sb.from("orders")
+        .update({ items: S.cart.map((l) => ({ name: l.name, qty: l.qty, cents: l.cents })), note: $("orderNote").value.trim().slice(0, 80) })
+        .eq("id", ed.id).select("num, paid").maybeSingle();
+      let err = error || (!row ? { message: "commande introuvable" } : null);
+      if (!err && paid && !row.paid) {
+        const r2 = await sb.from("orders").update({ paid: true }).eq("id", ed.id);
+        err = r2.error;
+      }
+      submitting = false;
+      if (err) { failed(err, "modifier la commande"); renderCart(); return; }
+      S.editing = null; S.cart = []; $("orderNote").value = ""; $("paidNow").checked = false;
+      renderCart(); setStatus("");
+      toast("Commande n°" + ed.num + " modifiée" + (paid ? " et encaissée" : ""));
+      await loadOrders(); renderOrders(); renderSummary();
+      return;
+    }
+
     const { data, error } = await sb.from("orders").insert({
       day: todayStr(),
       items: S.cart.map((l) => ({ name: l.name, qty: l.qty, cents: l.cents })),
@@ -277,18 +338,27 @@
     for (const o of list) {
       const ul = el("ul");
       for (const it of o.items || []) ul.append(el("li", null, el("span", { text: it.qty + " × " + it.name }), el("span", { class: "num", text: money(it.cents * it.qty) })));
+      const paidC = paidOf(o), rest = (o.total_cents || 0) - paidC;
+      const partial = !o.paid && paidC > 0;
+      const editingThis = S.editing && S.editing.id === o.id;
+      const editBtn = el("button", { class: "btn small", type: "button", text: editingThis ? "En cours…" : "Modifier", onclick: () => startEdit(o) });
+      editBtn.disabled = !!editingThis;
       const actions = el("div", { class: "actions" },
+        editBtn,
         o.paid
           ? el("button", { class: "btn small ghost", type: "button", text: "Marquer impayée", onclick: () => setPaid(o, false) })
-          : el("button", { class: "btn small terra", type: "button", text: "Marquer payée", onclick: () => setPaid(o, true) }));
+          : el("button", { class: "btn small terra", type: "button", text: partial ? "Encaisser le reste" : "Marquer payée", onclick: () => setPaid(o, true) }));
       if (isOwner()) actions.append(deleteButton(o));
-      const meta = [timeOf(o.created_at), o.note, isOwner() && o.created_by ? "par " + (S.staff[o.created_by] || "ancien employé") : ""].filter(Boolean).join(" · ");
-      box.append(el("article", { class: "ticket " + (o.paid ? "paid" : "unpaid") },
+      const meta = [timeOf(o.created_at), o.note, o.updated_at ? "modifiée " + timeOf(o.updated_at) : "",
+        isOwner() && o.created_by ? "par " + (S.staff[o.created_by] || "ancien employé") : ""].filter(Boolean).join(" · ");
+      const pillText = o.paid ? "PAYÉE " + timeOf(o.paid_at) : partial ? "RESTE " + money(rest) : "IMPAYÉE";
+      box.append(el("article", { class: "ticket " + (o.paid ? "paid" : "unpaid") + (editingThis ? " editing-now" : "") },
         el("div", { class: "ticket-head" },
           el("span", { class: "id", text: "n°" + o.num }),
           el("span", { class: "meta", text: meta }),
-          el("span", { class: "pill " + (o.paid ? "paid" : "unpaid"), text: o.paid ? "PAYÉE " + timeOf(o.paid_at) : "IMPAYÉE" })),
+          el("span", { class: "pill " + (o.paid ? "paid" : "unpaid"), text: pillText })),
         ul,
+        partial ? el("span", { class: "paid-part", text: "Déjà payé : " + money(paidC) + " · reste " + money(rest) }) : null,
         el("div", { class: "ticket-foot" }, el("span", { class: "total-amt num", text: money(o.total_cents) }), actions)));
     }
   }
@@ -303,8 +373,9 @@
     let paid = 0, due = 0, nPaid = 0, nDue = 0, items = 0;
     const byItem = new Map(), byStaff = new Map();
     for (const o of S.orders) {
-      const t = o.total_cents || 0;
-      if (o.paid) { paid += t; nPaid++; } else { due += t; nDue++; }
+      const t = o.total_cents || 0, pc = Math.min(paidOf(o), t);
+      paid += pc; due += t - pc;
+      if (o.paid) nPaid++; else nDue++;
       const who = o.created_by ? (S.staff[o.created_by] || "ancien employé") : "inconnu";
       const s = byStaff.get(who) || { n: 0, cents: 0 }; s.n++; s.cents += t; byStaff.set(who, s);
       for (const it of o.items || []) {
