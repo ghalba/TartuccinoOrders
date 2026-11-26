@@ -10,7 +10,10 @@
     $("setupView").hidden = false;
     return;
   }
-  const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  // Accept a pasted address with extra parts (e.g. ".../rest/v1/") — keep only https://xxxx.supabase.co
+  let baseUrl = String(cfg.supabaseUrl).trim();
+  try { baseUrl = new URL(baseUrl).origin; } catch (e) { /* leave as typed */ }
+  const sb = window.supabase.createClient(baseUrl, String(cfg.supabaseAnonKey).trim());
 
   const S = {
     user: null, role: "employee", name: "", staff: {},
@@ -74,7 +77,16 @@
     $("loginBtn").disabled = true; $("loginStatus").textContent = "Signing in…"; $("loginStatus").classList.remove("err");
     const { error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
     $("loginBtn").disabled = false;
-    if (error) { $("loginStatus").textContent = "Wrong email or password."; $("loginStatus").classList.add("err"); }
+    if (error) {
+      const m = (error.message || "").toLowerCase();
+      let msg;
+      if (m.includes("invalid login")) msg = "Wrong email or password, or this login doesn't exist in Supabase → Authentication → Users.";
+      else if (m.includes("not confirmed")) msg = "This login isn't confirmed yet. In Supabase → Authentication → Users, confirm the user (or recreate it with Auto Confirm ticked).";
+      else if (m.includes("fetch") || m.includes("network")) msg = "Can't reach the database. Check the supabaseUrl in config.js and the internet connection.";
+      else if (m.includes("api key") || m.includes("apikey")) msg = "The key in config.js isn't accepted. Paste the anon public key again.";
+      else msg = "Couldn't sign in: " + error.message;
+      $("loginStatus").textContent = msg; $("loginStatus").classList.add("err");
+    }
     else { $("loginStatus").textContent = ""; $("password").value = ""; }
   });
   $("signOut").addEventListener("click", () => sb.auth.signOut());
